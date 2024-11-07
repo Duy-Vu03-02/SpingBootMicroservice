@@ -1,5 +1,5 @@
----
-version: '3.7'
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -9,6 +9,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - mynetwork
 
   broker:
     image: confluentinc/cp-kafka:latest
@@ -17,12 +19,123 @@ services:
       - "9092:9092"
     depends_on:
       - zookeeper
-    restart: always
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,PLAINTEXT_INTERNAL://broker:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - mynetwork
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mayank28072001
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    networks:
+      - mynetwork
+
+  api-gateway:
+    image: api_gateway
+    container_name: api-gateway
+    depends_on:
+      - discovery-server
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+    ports:
+      - "8080:8080"
+    networks:
+      - mynetwork
+
+  discovery-server:
+    image: discovery_server
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      - EUREKA_INSTANCE_HOSTNAME=discovery-server
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+    networks:
+      - mynetwork
+
+  inventory_service:
+    image: inventory_service
+    container_name: inventory_service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - discovery-server
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inventory_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: mayank28072001
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_APPLICATION_NAME: inventory-service
+    networks:
+      - mynetwork
+
+  notification_service:
+    image: notification_service
+    container_name: notification_service
+    depends_on:
+      - broker
+      - discovery-server
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:9092
+    networks:
+      - mynetwork
+
+  order_service:
+    image: order_service
+    container_name: order_service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - broker
+      - discovery-server
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_service
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: mayank28072001
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: broker:9092
+      SPRING_APPLICATION_NAME: order-service
+      SPRING_ZIPKIN_BASEURL: http://zipkin:9411  # Thay localhost bằng zipkin
+    networks:
+      - mynetwork
+
+  product_service:
+    image: product_service
+    container_name: product_service
+    depends_on:
+      - discovery-server
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb+srv://vungovu00:Q93K2zN8L5DIpYGY@graphql.ucsncnj.mongodb.net/bookingcare?retryWrites=true&w=majority&appName=GraphQl
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      SPRING_APPLICATION_NAME: product-service
+    networks:
+      - mynetwork
+
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
