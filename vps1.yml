@@ -45,7 +45,7 @@ services:
       - mynetwork
 
   api-gateway:
-    image: api_gateway
+    image: khalisvu/api_gateway
     container_name: api-gateway
     depends_on:
       - discovery-server
@@ -57,7 +57,7 @@ services:
       - mynetwork
 
   discovery-server:
-    image: discovery_server
+    image: khalisvu/discovery_server
     container_name: discovery-server
     ports:
       - "8761:8761"
@@ -69,7 +69,7 @@ services:
       - mynetwork
 
   inventory_service:
-    image: inventory_service
+    image: khalisvu/inventory_service
     container_name: inventory_service
     ports:
       - "8082:8082"
@@ -86,7 +86,7 @@ services:
       - mynetwork
 
   notification_service:
-    image: notification_service
+    image: khalisvu/notification_service
     container_name: notification_service
     depends_on:
       - broker
@@ -98,7 +98,7 @@ services:
       - mynetwork
 
   order_service:
-    image: order_service
+    image: khalisvu/order_service
     container_name: order_service
     ports:
       - "8081:8081"
@@ -118,7 +118,7 @@ services:
       - mynetwork
 
   product_service:
-    image: product_service
+    image: khalisvu/product_service
     container_name: product_service
     depends_on:
       - discovery-server
@@ -139,4 +139,4 @@ services:
 
 networks:
   mynetwork:
-    driver: bridge
+    external: true
